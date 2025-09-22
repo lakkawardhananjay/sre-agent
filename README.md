@@ -73,56 +73,56 @@ We designed SRE-Agent to:
 The SRE-Agent integrates with Kubernetes and Prometheus to detect, heal, and analyze failures automatically.  
 
 ### Visual Flow
-![Kubernetes Cluster Healing Process](./_-%20visual%20selection%20(2).png)
+<img width="648" height="730" alt="Image" src="https://github.com/user-attachments/assets/793de75f-21af-44e1-86af-e7818520aa67" />
 
 
-```mermaid
-flowchart TD
-    A[Prometheus Metrics & Kubernetes Events] --> B[SRE-Agent Operator]
-    B -->|Healing Rules| C[Automated Remediation]
-    B -->|Logs & Events| D[Gemini API]
-    D --> E[AI-Powered RCA Report]
-    C --> F[Kubernetes Cluster Stabilized]
-⚡ Getting Started
-✅ Prerequisites
-A Kubernetes cluster (GKE preferred).
+````markdown
+## ⚡ Getting Started
 
-kubectl configured.
+### ✅ Prerequisites
+- A Kubernetes cluster (GKE preferred)  
+- `kubectl` configured  
+- Prometheus installed (optional)  
+- Google Cloud project with Gemini API enabled  
 
-Prometheus installed (optional).
+---
 
-Google Cloud project with Gemini API enabled.
+### ⚙️ Configuration
 
-⚙️ Configuration
-Define healing rules:
-
-bash
-Copy code
+**Define healing rules:**
+```bash
 kubectl create configmap sre-agent-playbook --from-file=healing-playbook.yaml
-Set Gemini API key:
+````
 
-bash
-Copy code
+**Set Gemini API key:**
+
+```bash
 export GEMINI_API_KEY=<YOUR_GEMINI_API_KEY>
-🚀 Deployment
-Build & push image:
+```
 
-bash
-Copy code
+---
+
+### 🚀 Deployment
+
+**Build & push Docker image:**
+
+```bash
 docker build -t gcr.io/<YOUR_PROJECT_ID>/sre-agent:latest .
 docker push gcr.io/<YOUR_PROJECT_ID>/sre-agent:latest
-Apply manifests:
+```
 
-bash
-Copy code
+**Apply Kubernetes manifests:**
+
+```bash
 kubectl apply -f kubernetes-manifests/sre-agent.yaml
-🧩 How It Works
-Runs as a Kubernetes Deployment.
+```
 
-Uses leader election for HA.
+---
 
-Continuously monitors cluster events & metrics.
+### 🧩 How It Works
 
-Executes healing rules (e.g., restart CrashLoopBackOff pods).
-
-Triggers RCA via Gemini API for detailed insights.
+* Runs as a Kubernetes Deployment
+* Uses leader election for high availability (HA)
+* Continuously monitors cluster events & metrics
+* Executes healing rules (e.g., restarts `CrashLoopBackOff` pods)
+* Triggers RCA via Gemini API for detailed insights
