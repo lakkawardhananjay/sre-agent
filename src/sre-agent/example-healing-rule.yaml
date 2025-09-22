@@ -1,0 +1,12 @@
+
+apiVersion: sre.google.com/v1
+kind: HealingRule
+metadata:
+  name: restart-crashloop-pods
+  namespace: default
+spec:
+  condition: CrashLoopBackOff
+  threshold: 0
+  action: restart_pod
+  namespace: default
+  enabled: true

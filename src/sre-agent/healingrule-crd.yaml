@@ -1,0 +1,35 @@
+
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: healingrules.sre.google.com
+spec:
+  group: sre.google.com
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                condition:
+                  type: string
+                threshold:
+                  type: integer
+                action:
+                  type: string
+                namespace:
+                  type: string
+                enabled:
+                  type: boolean
+  scope: Namespaced
+  names:
+    plural: healingrules
+    singular: healingrule
+    kind: HealingRule
+    shortNames:
+    - hr

@@ -1,0 +1,28 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: sre-agent-chaos
+  namespace: default
+spec:
+  engineState: 'active'
+  appinfo:
+    appns: 'default'
+    applabel: 'app=sre-agent'
+    appkind: 'deployment'
+  chaosServiceAccount: litmus-admin
+  experiments:
+  - name: pod-delete
+    spec:
+      components:
+        env:
+        # set chaos duration (in sec) as desired
+        - name: TOTAL_CHAOS_DURATION
+          value: '30'
+
+        # set chaos interval (in sec) as desired
+        - name: CHAOS_INTERVAL
+          value: '10'
+
+        # pod failures without '--force' kill
+        - name: FORCE
+          value: 'false'

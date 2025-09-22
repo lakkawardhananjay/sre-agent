@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sre-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sre-agent
+  template:
+    metadata:
+      labels:
+        app: sre-agent
+    spec:
+      containers:
+      - name: sre-agent
+        image: dhananjaylakkawar/sre-agent:v3
+        command: ["/bin/sh", "-c", "sleep 10000"]
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "250m"

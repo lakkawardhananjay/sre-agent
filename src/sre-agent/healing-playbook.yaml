@@ -1,0 +1,119 @@
+# SRE-Agent Healing Playbook
+# GKE Turns 10 Hackathon - Day 2 MVP
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sre-agent-playbook
+  namespace: default
+data:
+  healing-playbook.yaml: |
+    # Healing Rules Configuration
+    rules:
+      # Rule 1: Restart pods in CrashLoopBackOff state
+      - name: "restart-crashloop-pods"
+        description: "Automatically restart pods stuck in CrashLoopBackOff"
+        condition: "CrashLoopBackOff"
+        threshold: 0  # Trigger on any pod in CrashLoopBackOff
+        action: "restart_pod"
+        namespace: "default"
+        enabled: true
+        cooldown: 300  # 5 minutes cooldown between actions
+        
+      # Rule 2: Restart pods with high restart count
+      - name: "restart-high-restart-pods" 
+        description: "Restart pods that have restarted more than 3 times"
+        condition: "RestartCount"
+        threshold: 3
+        action: "restart_pod"
+        namespace: "default"
+        enabled: true
+        cooldown: 600  # 10 minutes cooldown
+        
+      # Rule 3: Handle pending pods
+      - name: "handle-pending-pods"
+        description: "Scale up deployment when too many pods are pending"
+        condition: "PodPending"
+        threshold: 2  # If more than 2 pods are pending
+        action: "scale_deployment:web-app:5"  # Scale web-app deployment to 5 replicas
+        namespace: "default"
+        enabled: false  # Disabled by default for safety
+        cooldown: 900   # 15 minutes cooldown
+        
+      # Rule 4: Memory pressure handling
+      - name: "memory-pressure-restart"
+        description: "Restart pods experiencing memory pressure"
+        condition: "MemoryPressure"
+        threshold: 80  # 80% memory usage
+        action: "restart_pod"
+        namespace: "default"
+        enabled: false  # Requires Prometheus metrics
+        cooldown: 300
+        
+      # Rule 5: CPU pressure handling  
+      - name: "cpu-pressure-scale"
+        description: "Scale deployment on high CPU usage"
+        condition: "CPUPressure" 
+        threshold: 85  # 85% CPU usage
+        action: "scale_deployment:web-app:3"
+        namespace: "default"
+        enabled: false  # Requires Prometheus metrics
+        cooldown: 600
+
+---
+# Additional playbook for different environments
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sre-agent-playbook-prod
+  namespace: production
+data:
+  healing-playbook.yaml: |
+    rules:
+      # Production rules - more conservative thresholds
+      - name: "prod-restart-crashloop-pods"
+        description: "Restart pods in CrashLoopBackOff (Production)"
+        condition: "CrashLoopBackOff"
+        threshold: 1  # Allow 1 pod in crashloop before acting
+        action: "restart_pod"
+        namespace: "production"
+        enabled: true
+        cooldown: 600  # Longer cooldown in production
+        
+      - name: "prod-restart-high-restart-pods"
+        description: "Restart pods with very high restart count (Production)"
+        condition: "RestartCount"
+        threshold: 5  # Higher threshold for production
+        action: "restart_pod"
+        namespace: "production"  
+        enabled: true
+        cooldown: 900
+        
+---
+# Staging environment playbook
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sre-agent-playbook-staging
+  namespace: staging
+data:
+  healing-playbook.yaml: |
+    rules:
+      # Staging rules - more aggressive for testing
+      - name: "staging-restart-crashloop-pods"
+        description: "Restart pods in CrashLoopBackOff (Staging)"
+        condition: "CrashLoopBackOff"
+        threshold: 0
+        action: "restart_pod"
+        namespace: "staging"
+        enabled: true
+        cooldown: 180  # Shorter cooldown for faster testing
+        
+      - name: "staging-auto-scale"
+        description: "Auto-scale on pending pods (Staging)"
+        condition: "PodPending"
+        threshold: 1
+        action: "scale_deployment:test-app:3"
+        namespace: "staging"
+        enabled: true
+        cooldown: 300
