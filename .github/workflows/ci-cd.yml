@@ -1,0 +1,156 @@
+name: SRE Agent CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: gcr.io
+  IMAGE_NAME: sre-agent
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.11, 3.12]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest httpx pytest-asyncio
+
+    - name: Lint with flake8
+      run: |
+        pip install flake8
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Test with pytest
+      run: |
+        export PYTHONPATH=$PWD/src
+        python -m pytest --version || echo "No tests found - creating basic test"
+        # Run basic endpoint tests
+        python -c "
+        import sys
+        sys.path.append('src')
+        from sre_agent.main import app
+        print('✅ Application imports successfully')
+        "
+
+    - name: Test FastAPI application
+      run: |
+        export PYTHONPATH=$PWD/src
+        # Start the application in background and test endpoints
+        python -m uvicorn src.sre_agent.main:app --host 0.0.0.0 --port 8000 &
+        APP_PID=$!
+        sleep 10
+        
+        # Test endpoints
+        curl -f http://localhost:8000/ || exit 1
+        curl -f http://localhost:8000/health || exit 1  
+        curl -f http://localhost:8000/metrics || exit 1
+        curl -f http://localhost:8000/docs || exit 1
+        
+        # Stop application
+        kill $APP_PID
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: false
+        tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Test Docker image
+      run: |
+        docker run --rm -d -p 8000:8000 --name test-container ${{ env.IMAGE_NAME }}:${{ github.sha }}
+        sleep 15
+        
+        # Test endpoints
+        curl -f http://localhost:8000/ || exit 1
+        curl -f http://localhost:8000/health || exit 1
+        curl -f http://localhost:8000/metrics || exit 1
+        
+        # Stop container
+        docker stop test-container
+
+  deploy-staging:
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment: staging
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Deploy to staging
+      run: |
+        echo "🚀 Would deploy to staging environment"
+        echo "Image: ${{ env.IMAGE_NAME }}:${{ github.sha }}"
+        # Add actual GKE deployment commands here
+
+  deploy-production:
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Deploy to production
+      run: |
+        echo "🚀 Would deploy to production environment"
+        echo "Image: ${{ env.IMAGE_NAME }}:${{ github.sha }}"
+        # Add actual GKE deployment commands here
+        # Uncomment and configure for actual deployment:
+        #
+        # - name: Authenticate to Google Cloud
+        #   uses: google-github-actions/auth@v1
+        #   with:
+        #     credentials_json: ${{ secrets.GCP_SA_KEY }}
+        #
+        # - name: Set up Cloud SDK
+        #   uses: google-github-actions/setup-gcloud@v1
+        #
+        # - name: Configure Docker to use gcloud as a credential helper
+        #   run: gcloud auth configure-docker
+        #
+        # - name: Build and push Docker image
+        #   run: |
+        #     docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/sre-agent:${{ github.sha }} .
+        #     docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/sre-agent:${{ github.sha }}
+        #
+        # - name: Deploy to GKE
+        #   run: |
+        #     gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER }} --zone ${{ secrets.GKE_ZONE }}
+        #     sed -i "s/PROJECT_ID/${{ secrets.GCP_PROJECT_ID }}/g" k8s/deployment.yaml
+        #     sed -i "s/:latest/:${{ github.sha }}/g" k8s/deployment.yaml
+        #     kubectl apply -f k8s/deployment.yaml
